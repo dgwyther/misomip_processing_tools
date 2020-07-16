@@ -3,15 +3,15 @@
 if 0 % ocean0
 hisname = 'ocean_his_ISOMIP_PLUS_Ocean0_5.00e-2.nc';
 grdname = 'Ocean1/isomip_plus_ocean1.nc';
-outname = 'TEST_Ocean0_COM_ROMSUTAS.nc'
+outname = 'TMP.Ocean0_COM_ROMSUTAS.nc'
 elseif 0
 hisname = 'Ocean1/ocean_his_ocean1.nc';
 grdname = 'Ocean1/isomip_plus_ocean1.nc';
-outname = 'TEST_Ocean1_COM_ROMSUTAS.nc'
+outname = 'TMP.Ocean1_COM_ROMSUTAS.nc'
 elseif 1
 hisname = 'Ocean2/ocean_his_ocean2.nc';
 grdname = 'Ocean2/isomip_plus_ocean2.nc';
-outname = 'TEST_Ocean2_COM_ROMSUTAS.nc'
+outname = 'TMP.Ocean2_COM_ROMSUTAS.nc'
 end
 Vtransform=2;
 Vstretching=1;

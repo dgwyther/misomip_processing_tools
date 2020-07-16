@@ -3,15 +3,15 @@
 if 0 %ocean0
 hisname = 'TYP/ocean_his_ocean0_TYP.nc';
 grdname = 'Ocean1/isomip_plus_ocean1.nc';
-outname = 'TYP/Ocean0_TYP_ROMSUTAS.nc'
+outname = 'TYP/TMP.Ocean0_TYP_ROMSUTAS.nc'
 elseif 0 %ocean1
 hisname = 'TYP/ocean_his_ocean1_TYP.nc';
 grdname = 'Ocean1/isomip_plus_ocean1.nc';
-outname = 'TYP/Ocean1_TYP_ROMSUTAS.nc'
+outname = 'TYP/TMP.Ocean1_TYP_ROMSUTAS.nc'
 elseif 1 %ocean2
 hisname = 'TYP/ocean_his_ocean2_TYP.nc';
 grdname = 'Ocean2/isomip_plus_ocean2.nc';
-outname = 'TYP/Ocean2_TYP_ROMSUTAS.nc'
+outname = 'TYP/TMP.Ocean2_TYP_ROMSUTAS.nc'
 end
 Vtransform=2;
 Vstretching=1;
@@ -40,10 +40,10 @@ N = length(Cs_r);
 dx = 1./pm;
 dy = 1./pn;
 mask_closed=ones(size(mask_zice)); mask_closed([1,end],:)=NaN; mask_closed(:,[1,end])=NaN;
-mask_zice(mask_zice==0)=NaN; mask_zice=mask_zice.*mask_closed;
-mask_rho(mask_rho==0)=NaN; mask_rho=mask_rho.*mask_closed;
-Area_ice = dx.*dy.*mask_zice;
-Area_water=dx.*dy.*mask_rho;
+mask_zice(mask_zice==0)=NaN; mask_zice=mask_zice;
+mask_rho(mask_rho==0)=NaN; mask_rho=mask_rho;
+Area_ice = dx.*dy.*mask_zice.*mask_closed;
+Area_water=dx.*dy.*mask_rho.*mask_closed;
 rho_i=918;%kgm^-3
 Cd=2.5e-3; %dimensionless
 u_t=0.01;%m/s
@@ -61,7 +61,7 @@ rmpath('/ds/projects/iomp/matlab_scripts/ROMS_MATLAB/utility/')
 %Zw = bsxfun(@plus,bsxfun(@times,h+zice,shiftdim(Cs_w,-2)),zice);
 dz = Zw(:,:,2:end)-Zw(:,:,1:end-1);
 dxdydz=bsxfun(@times,bsxfun(@times,dz,dx),dy);
-dxdydz_masked=bsxfun(@times,dxdydz,mask_rho);
+dxdydz_masked=bsxfun(@times,dxdydz,mask_rho.*mask_closed);
 
 % load data from output file
 m = flipud(double(ncread(hisname,'m')));
@@ -79,10 +79,10 @@ ocean_time=ncread(hisname,'ocean_time');
 
 meanMeltRate = squeeze(nansum(nansum(bsxfun(@times,m,Area_ice),2),1)) / squeeze(nansum(nansum(Area_ice,2),1));
 meanMeltFlux = squeeze(nansum(nansum(bsxfun(@times,m,Area_ice*rho_i),2),1));
-sumOfVolume = squeeze(nansum(nansum(bsxfun(@rdivide,bsxfun(@plus,h+iceDraft,zeta),(pm.*pn)),2),1));
-meanTemperature = squeeze(nansum(nansum(nansum(bsxfun(@times,temp,bsxfun(@times,dxdydz,mask_rho)),3),2),1)./nansum(nansum(nansum(bsxfun(@times,dxdydz,mask_rho),3),2),1));
-meanSalinity = squeeze(nansum(nansum(nansum(bsxfun(@times,salt,bsxfun(@times,dxdydz,mask_rho)),3),2),1)./nansum(nansum(nansum(bsxfun(@times,dxdydz,mask_rho),3),2),1));
-meltRate=bsxfun(@times,m,mask_zice);
+sumOfVolume = squeeze(nansum(nansum(bsxfun(@rdivide,bsxfun(@plus,(h+zice).*mask_rho.*mask_closed,zeta),(pm.*pn)),2),1));
+meanTemperature = squeeze(nansum(nansum(nansum(bsxfun(@times,temp,bsxfun(@times,dxdydz,mask_rho.*mask_closed)),3),2),1)./nansum(nansum(nansum(bsxfun(@times,dxdydz,mask_rho.*mask_closed),3),2),1));
+meanSalinity = squeeze(nansum(nansum(nansum(bsxfun(@times,salt,bsxfun(@times,dxdydz,mask_rho.*mask_closed)),3),2),1)./nansum(nansum(nansum(bsxfun(@times,dxdydz,mask_rho.*mask_closed),3),2),1));
+meltRate=bsxfun(@times,m,mask_zice.*mask_closed);
 %u*
 u_mod = (u(1:end-1,2:end-1,:,:)+u(2:end,2:end-1,:,:))/2;
 v_mod = (v(2:end-1,1:end-1,:,:)+v(2:end-1,2:end,:,:))/2;
@@ -91,7 +91,7 @@ v_mod(end+1,:,:,:)=NaN;v_mod(:,end+1,:,:)=NaN;
 u_mod(2:end+1,:,:,:)=u_mod;u_mod(1,:,:,:)=NaN;u_mod(:,2:end+1,:,:)=u_mod;u_mod(:,1,:,:)=NaN;
 v_mod(2:end+1,:,:,:)=v_mod;v_mod(1,:,:,:)=NaN;v_mod(:,2:end+1,:,:)=v_mod;v_mod(:,1,:,:)=NaN;
 Ustar = sqrt(Cd)*sqrt(sqrt(squeeze(u_mod(:,:,N,:)).^2 + squeeze(v_mod(:,:,N,:)).^2).^2+u_t^2); disp('ustar computed post-results from sqrt(cd)*sqrt(u^2+u_t^2)') 
-Ustar = bsxfun(@times,Ustar,mask_zice);
+Ustar = bsxfun(@times,Ustar,mask_zice.*mask_closed);
 %Tb is in situ -> convert to pot
 addpath(genpath('/ds/projects/iomp/matlab_scripts/GSW'))
 p_top = gsw_p_from_z(squeeze(Zw(:,:,N)),lat_rho);
@@ -103,18 +103,45 @@ disp([num2str(tt/size(temp,4)*100) '%'])
 end
 end
 rmpath(genpath('/ds/projects/iomp/matlab_scripts/GSW'))
-Tstar = bsxfun(@times,squeeze(temp(:,:,N,:))-TbPot,mask_zice); 
-Sstar = bsxfun(@times,squeeze(salt(:,:,N,:))-Sb,mask_zice);
-u_top = squeeze(u_mod(:,:,N,:));
-v_top = squeeze(v_mod(:,:,N,:));
+Tstar = bsxfun(@times,squeeze(temp(:,:,N,:))-TbPot,mask_zice.*mask_closed); 
+Sstar = bsxfun(@times,squeeze(salt(:,:,N,:))-Sb,mask_zice.*mask_closed);
+u_top = bsxfun(@times,squeeze(u_mod(:,:,N,:)),mask_zice.*mask_closed);
+v_top = bsxfun(@times,squeeze(v_mod(:,:,N,:)),mask_zice.*mask_closed);
 %psi = -cumsum(ubarMod2.*(h_Mod+zice_Mod).*dy(2:end-1,2:end-1),2);
+disp('calculate barotropic SF')
+if 0 % method to move u/v to rho points for summation
+ubar(:,end,:)=0;
 ubar_mod = 1/2*(ubar(1:end-1,2:end-1,:)+ubar(2:end,2:end-1,:)); ubar_mod(isnan(ubar_mod))=0;
 vbar_mod = 1/2*(vbar(1:end-1,2:end-1,:)+vbar(2:end,2:end-1,:)); vbar_mod(isnan(vbar_mod))=0;
-
 baroSF = -cumsum(bsxfun(@times,ubar_mod,(h(2:end-1,2:end-1)+zice(2:end-1,2:end-1)).*dy(2:end-1,2:end-1)),2);
 baroSF(end+1,:,:,:)=NaN; baroSF(:,end+1,:,:)=NaN;
 baroSF(2:end+1,:,:,:)=baroSF;baroSF(1,:,:,:)=NaN;baroSF(:,2:end+1,:,:)=baroSF;baroSF(:,1,:,:)=NaN;
-
+elseif 1 % method to move h/zice/pn/pm to u,v points
+et_s=1;
+et_e=240;
+et_c=240;
+xi_s=1;
+xi_e=40;
+xi_c=40;
+ % water column thickness at velocity points
+hv = (h(2:end-1,1:end-1)+h(2:end-1,2:end))/2 + (zice(2:end-1,1:end-1)+zice(2:end-1,2:end))/2;
+hu = (h(1:end-1,2:end-1)+h(2:end,2:end-1))/2 + (zice(1:end-1,2:end-1)+zice(1:end-1,2:end-1))/2;
+ % grid size at velocity points
+dx = 2./(pm(:,1:end-1)+pm(:,2:end));
+de = 2./(pn(1:end-1,:)+pn(2:end,:));
+ % initialise psi
+psi = zeros(size(h));
+ % make nan ubars 0
+vbar(isnan(vbar))=0;  ubar(isnan(ubar))=0;
+ % compute transports at density points
+tu = (ubar(1:end-1,et_s+1:et_e-1,:).*de(1:end-1,et_s+1:et_e-1).*hu(1:end-1,:)+ubar(2:end,et_s+1:et_e-1,:).*de(2:end,et_s+1:et_e-1).*hu(2:end,:))./2;
+tv = (vbar(xi_s+1:xi_e-1,1:end-1,:).*dx(xi_s+1:xi_e-1,1:end-1).*hv(:,1:end-1)+vbar(xi_s+1:xi_e-1,2:end,:).*dx(xi_s+1:xi_e-1,2:end).*hv(:,2:end))./2;
+ % calculate baro SF
+psi=-cumsum(tu,2);
+baroSF = nan([size(m)]);
+baroSF(2:end-1,2:end-1,:)=psi;
+end
+%
 if 0 %calculate OTSF
 % dx*dz*v integrate into page, cumsum bottom-top
 disp('interpolating v-velocity to z-levels')
@@ -150,8 +177,8 @@ else
 otSF = zeros(size(x_rho,2),length(Z_interp),length(ocean_time));
 end
 
-T_bot = squeeze(temp(:,:,1,:));
-S_bot = squeeze(salt(:,:,1,:));
+T_bot = bsxfun(@times,squeeze(temp(:,:,1,:)),mask_rho.*mask_closed);
+S_bot = bsxfun(@times,squeeze(salt(:,:,1,:)),mask_rho.*mask_closed);
 
 %interpolation of the form:
 X_trans1=repmat(squeeze(x_rho(20,:))',[1 N]);
